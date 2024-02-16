@@ -438,29 +438,10 @@ read_autorunCmd() {
 
 play_wine() {
     GAMENAME=$1
-    WINEPOINT="${GAMENAME}"
+    WINEPOINT=$((test -n "$2" && echo "$2") || echo "${GAMENAME}")
 
     wine_options "${WINEPOINT}"
     install_dependencies "${WINEPOINT}" || return 1
-
-    read_autorunCmd
-    if test -n "${WINE_LANG}"
-	then
-        (cd "${WINEPOINT}/${WINE_DIR}" && LC_ALL=${WINE_LANG} WINEPREFIX=${WINEPOINT} eval "${WINE} ${VDESKTOP} ${WINE_CMD}")
-    else
-        (cd "${WINEPOINT}/${WINE_DIR}" && WINEPREFIX=${WINEPOINT} eval "${WINE} ${VDESKTOP} ${WINE_CMD}")
-    fi
-    waitWineServer
-}
-
-play_pc() {
-    GAMENAME=$1
-    WINEPOINT="${WINE_BOTTLE_DIR}/${WINE_VERSION}/"$(basename "${GAMENAME}")".wine"
-    
-    wine_options "${WINEPOINT}"
-    createWineDirectory "${WINEPOINT}" || return 1
-    install_dependencies "${WINEPOINT}" || return 1
-    sandboxing_prefix "${WINEPOINT}" || return 1
 
     read_autorunCmd
     if test -n "${WINE_LANG}"
@@ -470,6 +451,15 @@ play_pc() {
         (cd "${GAMENAME}/${WINE_DIR}" && WINEPREFIX=${WINEPOINT} eval "${WINE} ${VDESKTOP} ${WINE_CMD}")
     fi
     waitWineServer
+}
+
+play_pc() {
+    GAMENAME=$1
+    WINEPOINT="${WINE_BOTTLE_DIR}/${WINE_VERSION}/"$(basename "${GAMENAME}")".wine"
+    createWineDirectory "${WINEPOINT}" || return 1
+    sandboxing_prefix "${WINEPOINT}" || return 1
+
+    play_wine "$GAMENAME" "$WINEPOINT"
 }
 
 trick_wine() {
