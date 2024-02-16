@@ -354,6 +354,14 @@ dxvk_install() {
     return 0
 }
 
+install_dependencies() {
+    redist_install "${WINEPOINT}" || return 1
+    msi_install "${WINEPOINT}" || return 1
+    reg_install "${WINEPOINT}" || return 1
+    fonts_install "${WINEPOINT}" || return 1
+    dxvk_install "${WINEPOINT}" || return 1
+}
+
 sandboxing_prefix() {
     if [ -d "${WINEPREFIX}/drive_c/users/steamuser" ]; then
         USERNAME=steamuser
@@ -433,11 +441,7 @@ play_wine() {
     WINEPOINT="${GAMENAME}"
 
     wine_options "${WINEPOINT}"
-    redist_install "${WINEPOINT}" || return 1
-    msi_install "${WINEPOINT}" || return 1
-    reg_install "${WINEPOINT}" || return 1
-    fonts_install "${WINEPOINT}" || return 1
-    dxvk_install "${WINEPOINT}" || return 1
+    install_dependencies "${WINEPOINT}" || return 1
 
     read_autorunCmd
     if test -n "${WINE_LANG}"
@@ -455,12 +459,8 @@ play_pc() {
     
     wine_options "${WINEPOINT}"
     createWineDirectory "${WINEPOINT}" || return 1
-    redist_install "${WINEPOINT}" || return 1
-    msi_install "${WINEPOINT}" || return 1
-    reg_install "${WINEPOINT}" || return 1
-    fonts_install "${WINEPOINT}" || return 1
+    install_dependencies "${WINEPOINT}" || return 1
     sandboxing_prefix "${WINEPOINT}" || return 1
-    dxvk_install "${WINEPOINT}" || return 1
 
     read_autorunCmd
     if test -n "${WINE_LANG}"
@@ -500,12 +500,8 @@ play_exe() {
 
     wine_options "${WINEPOINT}"
     createWineDirectory "${WINEPOINT}" || return 1
-    redist_install "${WINEPOINT}" || return 1
-    msi_install "${WINEPOINT}" || return 1
-    reg_install "${WINEPOINT}" || return 1
-    fonts_install "${WINEPOINT}" || return 1
+    install_dependencies "${WINEPOINT}" || return 1
     sandboxing_prefix "${WINEPOINT}" || return 1
-    dxvk_install "${WINEPOINT}" || return 1
 
     (cd "${GAMEDIR}" && WINEPREFIX=${WINEPOINT} wine "${GAMEEXE}")
     waitWineServer
@@ -522,11 +518,7 @@ play_winetgz() {
 	    (cd "${WINEPOINT}" && gunzip -c "${GAMENAME}" | tar xf -) || return 1
     fi
 
-    redist_install "${WINEPOINT}" || return 1
-    msi_install "${WINEPOINT}" || return 1
-    reg_install "${WINEPOINT}" || return 1
-    fonts_install "${WINEPOINT}" || return 1
-    dxvk_install "${WINEPOINT}" || return 1
+    install_dependencies "${WINEPOINT}" || return 1
 
     read_autorunCmd
     if test -n "${WINE_LANG}"
