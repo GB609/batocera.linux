@@ -415,21 +415,29 @@ createWineDirectory() {
 
 getWine_var() {
     WINEPOINT=$1
-    WINEVAR=$2
-    WINEVALUE=$3
+    local WINEVAR=$2
+    local WINEVALUE=$3
 
     if test -e "${WINEPOINT}/autorun.cmd"
     then
-	    VAL=$(cat "${WINEPOINT}/autorun.cmd" | dos2unix | grep "^${WINEVAR}=" | sed -e s+"^${WINEVAR}="+""+ | head -1)
-	if test -n "${VAL}"
-	then
-	    echo "${VAL}"
-	else
-	    echo "${WINEVALUE}"
-	fi
-    else
-	    echo "${WINEVALUE}"
+	    local VAL=$(cat "${WINEPOINT}/autorun.cmd" | dos2unix | grep "^${WINEVAR}=" | sed -e s+"^${WINEVAR}="+""+ | head -1)
+    	if test -n "${VAL}"
+    	then
+    	    WINEVALUE="${VAL}"
+    	fi
     fi
+
+    echo "$WINEVALUE"
+}
+
+#creates global variables WINE_CMD, WINE_DIR, WINE_LANG and WINE_CDROM with data supplied by autorun.cmd
+#first argument passed to this function is used as default for CMD, 'explorer' is fallback
+read_autorunCmd() {
+    local defaultCmd=$( (test -n "$1" && echo "$1") || echo "explorer")
+    WINE_CMD=$(getWine_var "${WINEPOINT}" "CMD" "$defaultCmd")
+    WINE_DIR=$(getWine_var "${WINEPOINT}" "DIR" "")
+    WINE_LANG=$(getWine_var "${WINEPOINT}" "LANG" "")
+    WINE_CDROM=$(getWine_var "${WINEPOINT}" "CDROM" "")
 }
 
 play_wine() {
@@ -442,9 +450,8 @@ play_wine() {
     reg_install "${WINEPOINT}" || return 1
     fonts_install "${WINEPOINT}" || return 1
     dxvk_install "${WINEPOINT}" || return 1
-    WINE_CMD=$(getWine_var "${WINEPOINT}" "CMD" "explorer")
-    WINE_DIR=$(getWine_var "${WINEPOINT}" "DIR" "")
-    WINE_LANG=$(getWine_var "${WINEPOINT}" "LANG" "")
+
+    read_autorunCmd
     if test -n "${WINE_LANG}"
 	then
         (cd "${WINEPOINT}/${WINE_DIR}" && LC_ALL=${WINE_LANG} WINEPREFIX=${WINEPOINT} eval "${WINE} ${VDESKTOP} ${WINE_CMD}")
@@ -467,9 +474,7 @@ play_pc() {
     sandboxing_prefix "${WINEPOINT}" || return 1
     dxvk_install "${WINEPOINT}" || return 1
 
-    WINE_CMD=$(getWine_var "${GAMENAME}" "CMD" "explorer")
-    WINE_DIR=$(getWine_var "${GAMENAME}" "DIR" "")
-    WINE_LANG=$(getWine_var "${GAMENAME}" "LANG" "")
+    read_autorunCmd
     if test -n "${WINE_LANG}"
 	then
         (cd "${GAMENAME}/${WINE_DIR}" && LC_ALL=${WINE_LANG} WINEPREFIX=${WINEPOINT} eval "${WINE} ${VDESKTOP} ${WINE_CMD}")
@@ -535,9 +540,7 @@ play_winetgz() {
     fonts_install "${WINEPOINT}" || return 1
     dxvk_install "${WINEPOINT}" || return 1
 
-    WINE_CMD=$(getWine_var "${WINEPOINT}" "CMD" "explorer")
-    WINE_DIR=$(getWine_var "${WINEPOINT}" "DIR" "")
-    WINE_LANG=$(getWine_var "${WINEPOINT}" "LANG" "")
+    read_autorunCmd
     if test -n "${WINE_LANG}"
 	then
         (cd "${WINEPOINT}/${WINE_DIR}" && LC_ALL=${WINE_LANG} WINEPREFIX=${WINEPOINT} eval "${WINE} ${VDESKTOP} ${WINE_CMD}")
@@ -589,9 +592,7 @@ play_squashfs() {
     fonts_install "${WINEPOINT}" || return 1
     dxvk_install "${WINEPOINT}" || return 1
 
-    WINE_CMD=$(getWine_var "${WINEPOINT}" "CMD" "explorer")
-    WINE_DIR=$(getWine_var "${WINEPOINT}" "DIR" "")
-    WINE_LANG=$(getWine_var "${WINEPOINT}" "LANG" "")
+    read_autorunCmd
     if test -n "${WINE_LANG}"
 	then
         (cd "${WINEPOINT}/${WINE_DIR}" && LC_ALL=${WINE_LANG} WINEPREFIX=${WINEPOINT} eval "${WINE} ${VDESKTOP} ${WINE_CMD}")
