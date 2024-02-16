@@ -718,7 +718,7 @@ wine2winetgz() {
 }
 
 gameext() {
-    echo "${1}" | sed -e s+"^.*\.\([^\.]*\)$"+"\1"+ | tr A-Z a-z
+    basename $(echo "${1}" | sed -e s+"^.*\.\([^\.]*\)$"+"\1"+ | tr A-Z a-z)
 }
 
 cleanAndExit() {
