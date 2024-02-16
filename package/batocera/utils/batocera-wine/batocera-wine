@@ -436,6 +436,50 @@ read_autorunCmd() {
     WINE_CDROM=$(getWine_var "${WINEPOINT}" "CDROM" "")
 }
 
+basename_no_dup() {
+    GAMENAME=$1
+    BASEGAMENAME=$(basename "${GAMENAME}")
+    CANDIDATE=$(echo "${G_ROMS_DIR}/${BASEGAMENAME}" | sed -e s+"\.exe$"++)".wine"
+    i=0
+    while [ -d "${CANDIDATE}" ]; do
+        i=$((i+1))
+        BASEGAMENAME=$(basename "${GAMENAME}")"_${i}"
+        # Keep the extension, easier to troubleshoot when you have multiple setup.exe
+        CANDIDATE=$(echo "${G_ROMS_DIR}/${BASEGAMENAME}")".wine"
+    done
+    echo "${BASEGAMENAME}"
+}
+
+#mount the ISO image given with $1 as d: under the dosdevices of WINEPOINT given as $2
+#installs a script trap to clean up/unmount on EXIT
+mount_iso() {
+    local ISO_PATH="$1"
+    local WINE_DEVICE_D="$2/dosdevices/d:"
+    local BASEGAMENAME=$(basename_no_dup "${ISO_PATH}")
+    local MOUNT_POINT="/var/run/wine/${BASEGAMENAME}.cdrom"
+
+    mkdir -p "${MOUNT_POINT}" || return 1
+    echo "mount $ISO_PATH on $MOUNT_POINT..."
+    if test -f "$ISO_PATH"; then
+        mount -o loop "$ISO_PATH" "$MOUNT_POINT" || (echo 'failed!' && return 1)
+    else
+        echo 'file does not exist!'
+        return 1
+    fi
+    
+    mkdir -p $(dirname "${WINE_DEVICE_D}")
+    ln -sf "${MOUNT_POINT}" "$WINE_DEVICE_D"
+
+    #trap EXIT signal to clean up and unmount when the script finishes
+    trap "umount '${MOUNT_POINT}'; rm -f '${MOUNT_POINT}' '$WINE_DEVICE_D'" EXIT
+}
+
+#If autorun.cmd has CDROM variable configured, it is mounted.
+#Does nothing otherwise
+optional_mount_disc(){
+    test -f "$WINE_CDROM" && mount_iso "$WINE_CDROM" "$WINEPOINT"
+}
+
 play_wine() {
     GAMENAME=$1
     WINEPOINT=$((test -n "$2" && echo "$2") || echo "${GAMENAME}")
@@ -444,6 +488,7 @@ play_wine() {
     install_dependencies "${WINEPOINT}" || return 1
 
     read_autorunCmd
+    optional_mount_disc
     if test -n "${WINE_LANG}"
 	then
         (cd "${GAMENAME}/${WINE_DIR}" && LC_ALL=${WINE_LANG} WINEPREFIX=${WINEPOINT} eval "${WINE} ${VDESKTOP} ${WINE_CMD}")
@@ -511,6 +556,7 @@ play_winetgz() {
     install_dependencies "${WINEPOINT}" || return 1
 
     read_autorunCmd
+    optional_mount_disc
     if test -n "${WINE_LANG}"
 	then
         (cd "${WINEPOINT}/${WINE_DIR}" && LC_ALL=${WINE_LANG} WINEPREFIX=${WINEPOINT} eval "${WINE} ${VDESKTOP} ${WINE_CMD}")
@@ -563,6 +609,7 @@ play_squashfs() {
     dxvk_install "${WINEPOINT}" || return 1
 
     read_autorunCmd
+    optional_mount_disc
     if test -n "${WINE_LANG}"
 	then
         (cd "${WINEPOINT}/${WINE_DIR}" && LC_ALL=${WINE_LANG} WINEPREFIX=${WINEPOINT} eval "${WINE} ${VDESKTOP} ${WINE_CMD}")
@@ -589,20 +636,6 @@ init_cmd() {
 	echo "#DIR=drive_c/Program Files/myprogram"
 	echo "#CMD=start.exe"
     ) > "${WINEPOINT}/autorun.cmd"
-}
-
-basename_no_dup() {
-    GAMENAME=$1
-    BASEGAMENAME=$(basename "${GAMENAME}")
-    CANDIDATE=$(echo "${G_ROMS_DIR}/${BASEGAMENAME}" | sed -e s+"\.exe$"++)".wine"
-    i=0
-    while [ -d "${CANDIDATE}" ]; do
-        i=$((i+1))
-        BASEGAMENAME=$(basename "${GAMENAME}")"_${i}"
-        # Keep the extension, easier to troubleshoot when you have multiple setup.exe
-        CANDIDATE=$(echo "${G_ROMS_DIR}/${BASEGAMENAME}")".wine"
-    done
-    echo "${BASEGAMENAME}"
 }
 
 install_exe() {
@@ -636,35 +669,18 @@ install_msi() {
 install_iso() {
     GAMENAME=$1
     BASEGAMENAME=$(basename_no_dup "${GAMENAME}")
-    GAMEISOMOUNT="/var/run/wine/${BASEGAMENAME}.cdrom"
-    INSTALLERISO="${GAMENAME}"
-
-    mkdir -p "${GAMEISOMOUNT}" || return 1
-    if ! mount -t iso9660 "${INSTALLERISO}" "${GAMEISOMOUNT}"
-    then
-        if ! mount -t udf "${INSTALLERISO}" "${GAMEISOMOUNT}"
-        then
-            rmdir "${GAMEISOMOUNT}"
-            return 1
-        fi
-    fi
-
+        
     WINEPOINT=$(echo "${G_ROMS_DIR}/${BASEGAMENAME}" | sed -e s+"\.iso$"++)".wine"
-
     createWineDirectory "${WINEPOINT}"
     
-    if mkdir -p "${WINEPOINT}/dosdevices" && rm -f "${WINEPOINT}/dosdevices/d:" && ln -sf "${GAMEISOMOUNT}" "${WINEPOINT}/dosdevices/d:"
-    then
-	    WINEPREFIX=${WINEPOINT} wine explorer "d:"
-	    rm -f "${WINEPOINT}/dosdevices/d:"
-    fi
+    mount_iso "$GAMENAME" "${WINEPOINT}" || return 1
+    
+    WINEPREFIX=${WINEPOINT} wine explorer "d:"	    
 
     waitWineServer
     init_cmd "${WINEPOINT}"
 
-    # try to clean the cdrom
-    umount "${GAMEISOMOUNT}"
-    rmdir "${GAMEISOMOUNT}"
+    #trap from mount_iso performs cleanup
 }
 
 wine2squashfs() {
